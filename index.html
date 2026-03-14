@@ -1013,9 +1013,9 @@ function renderItinerary() {
             ${a.notes ? `<div class="act-note">${a.notes}</div>` : ''}
             <span class="act-cat ${catColors(a.category)}">${catLabel(a.category)}</span>
           </div>
-          <div style="display:flex;gap:2px;flex-shrink:0">
-            <button class="act-del" style="font-size:13px" onclick="editActivity('${a.id}')">✏️</button>
-            <button class="act-del" onclick="deleteActivity('${a.id}')">✕</button>
+          <div style="display:flex;gap:6px;flex-shrink:0;margin-left:4px">
+            <button class="act-del" style="font-size:13px;padding:4px 7px;border-radius:6px;background:var(--gray-50);border:var(--border)" onclick="editActivity('${a.id}')">✏️</button>
+            <button class="act-del" style="padding:4px 7px;border-radius:6px;background:var(--red-dim);color:var(--red);border:1px solid rgba(229,62,62,0.2)" onclick="deleteActivity('${a.id}')">✕</button>
           </div>
         </div>
       `).join('')}
@@ -1572,9 +1572,9 @@ function renderBudget() {
           </div>
         </div>
         <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;margin-right:6px;white-space:nowrap">${sym}${e.amount.toLocaleString('en-IN')}</div>
-        <div style="display:flex;gap:2px;flex-shrink:0">
-          <button class="act-del" style="font-size:13px" onclick="editExpense('${e.id}')">✏️</button>
-          <button class="act-del" onclick="deleteExpense('${e.id}')">✕</button>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:4px">
+          <button class="act-del" style="font-size:13px;padding:4px 7px;border-radius:6px;background:var(--gray-50);border:var(--border)" onclick="editExpense('${e.id}')">✏️</button>
+          <button class="act-del" style="padding:4px 7px;border-radius:6px;background:var(--red-dim);color:var(--red);border:1px solid rgba(229,62,62,0.2)" onclick="deleteExpense('${e.id}')">✕</button>
         </div>
       </div>
     `).join('') : `<div class="empty"><div class="empty-icon">💰</div><h3>No expenses yet</h3><p>Track what everyone spends</p><button class="btn btn-primary btn-sm" onclick="openExpenseModal()">Add First Expense</button></div>`}
