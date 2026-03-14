@@ -568,7 +568,7 @@ input[type=file] { display: none; }
 <div class="modal-overlay" id="modal-expense">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Add Expense</div>
+    <div class="modal-title" id="expense-modal-title">Add Expense</div>
     <div class="form-group"><label>Description</label><input type="text" id="e-name" placeholder="e.g. Hotel booking"></div>
     <div class="form-grid">
       <div class="form-group"><label>Amount</label><input type="number" id="e-amount" placeholder="0"></div>
@@ -1343,15 +1343,17 @@ async function removeDoc(id) {
 function fmtSize(b) { if (b > 1048576) return (b / 1048576).toFixed(1) + ' MB'; return Math.round(b / 1024) + ' KB'; }
 
 // ── BUDGET ──
+let editingExpenseId = null;
+
 function openExpenseModal() {
+  editingExpenseId = null;
+  $('expense-modal-title').textContent = 'Add Expense';
+  $('e-name').value = ''; $('e-amount').value = ''; $('e-cat').value = 'Accommodation';
   const t = getTrip();
   const travellers = t.travellers || [];
-  $('e-name').value = ''; $('e-amount').value = ''; $('e-cat').value = 'Accommodation';
-  // Paid by
   const pb = $('e-paidby');
   pb.innerHTML = '<option value="__shared">Shared / Unknown</option>' +
     travellers.map(tr => `<option value="${tr}">${tr}</option>`).join('');
-  // Split between checkboxes — all selected by default
   const sl = $('e-split-list');
   if (!travellers.length) {
     sl.innerHTML = `<div style="font-size:12px;color:var(--gray-400)">Add travellers to the trip to enable splitting</div>`;
@@ -1359,6 +1361,34 @@ function openExpenseModal() {
     sl.innerHTML = travellers.map(tr => `
       <label style="display:inline-flex;align-items:center;gap:6px;background:var(--gray-50);border:var(--border);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer">
         <input type="checkbox" value="${tr}" checked style="width:13px;height:13px;accent-color:var(--accent)"> ${tr.split(' ')[0]}
+      </label>
+    `).join('');
+  }
+  $('modal-expense').classList.add('open');
+  setTimeout(() => $('e-name').focus(), 100);
+}
+
+function editExpense(id) {
+  const t = getTrip();
+  const e = t.expenses.find(x => x.id === id);
+  if (!e) return;
+  editingExpenseId = id;
+  $('expense-modal-title').textContent = 'Edit Expense';
+  $('e-name').value = e.name;
+  $('e-amount').value = e.amount;
+  $('e-cat').value = e.category || 'Accommodation';
+  const travellers = t.travellers || [];
+  const pb = $('e-paidby');
+  pb.innerHTML = '<option value="__shared">Shared / Unknown</option>' +
+    travellers.map(tr => `<option value="${tr}">${tr}</option>`).join('');
+  pb.value = e.paidBy || '__shared';
+  const sl = $('e-split-list');
+  if (!travellers.length) {
+    sl.innerHTML = `<div style="font-size:12px;color:var(--gray-400)">No travellers added</div>`;
+  } else {
+    sl.innerHTML = travellers.map(tr => `
+      <label style="display:inline-flex;align-items:center;gap:6px;background:var(--gray-50);border:var(--border);border-radius:20px;padding:5px 12px;font-size:12px;cursor:pointer">
+        <input type="checkbox" value="${tr}" ${!e.splitBetween || e.splitBetween.includes(tr) ? 'checked' : ''} style="width:13px;height:13px;accent-color:var(--accent)"> ${tr.split(' ')[0]}
       </label>
     `).join('');
   }
@@ -1377,17 +1407,28 @@ async function saveExpense() {
   const splitBetween = splitChecks.length > 0
     ? Array.from(splitChecks).map(c => c.value)
     : (t.travellers || []);
-  t.expenses.push({
-    id: uid(), name, amount, category: $('e-cat').value,
-    date: new Date().toISOString().split('T')[0],
-    paidBy: paidBy === '__shared' ? null : paidBy,
-    splitBetween: splitBetween.length ? splitBetween : null
-  });
+  if (editingExpenseId) {
+    const ex = t.expenses.find(x => x.id === editingExpenseId);
+    if (ex) {
+      ex.name = name; ex.amount = amount; ex.category = $('e-cat').value;
+      ex.paidBy = paidBy === '__shared' ? null : paidBy;
+      ex.splitBetween = splitBetween.length ? splitBetween : null;
+    }
+    toast('Expense updated!');
+  } else {
+    t.expenses.push({
+      id: uid(), name, amount, category: $('e-cat').value,
+      date: new Date().toISOString().split('T')[0],
+      paidBy: paidBy === '__shared' ? null : paidBy,
+      splitBetween: splitBetween.length ? splitBetween : null
+    });
+    toast('Expense added!');
+  }
+  editingExpenseId = null;
   await saveTrip_db(t);
   closeModal('modal-expense');
   renderBudget();
   renderDetail();
-  toast('Expense added!');
 }
 
 async function deleteExpense(id) {
@@ -1531,7 +1572,10 @@ function renderBudget() {
           </div>
         </div>
         <div style="font-family:var(--font-mono);font-size:13px;font-weight:500;margin-right:6px;white-space:nowrap">${sym}${e.amount.toLocaleString('en-IN')}</div>
-        <button class="act-del" onclick="deleteExpense('${e.id}')">✕</button>
+        <div style="display:flex;gap:2px;flex-shrink:0">
+          <button class="act-del" style="font-size:13px" onclick="editExpense('${e.id}')">✏️</button>
+          <button class="act-del" onclick="deleteExpense('${e.id}')">✕</button>
+        </div>
       </div>
     `).join('') : `<div class="empty"><div class="empty-icon">💰</div><h3>No expenses yet</h3><p>Track what everyone spends</p><button class="btn btn-primary btn-sm" onclick="openExpenseModal()">Add First Expense</button></div>`}
   `;
