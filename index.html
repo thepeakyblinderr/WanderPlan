@@ -303,7 +303,7 @@ input[type=file] { display: none; }
 <body>
 <div id="app">
   <header class="topbar">
-    <div class="logo">Wander<span style="color:var(--accent)">Plan</span><sup>BETA</sup></div>
+    <div class="logo">Wander<span style="color:var(--accent)">Plan</span></div>
     <button class="btn btn-primary btn-sm" onclick="nav2add()">+ Trip</button>
   </header>
 
@@ -397,7 +397,7 @@ input[type=file] { display: none; }
       <button class="tab-btn" onclick="switchTab('documents')">Documents</button>
       <button class="tab-btn" onclick="switchTab('budget')">Budget</button>
       <button class="tab-btn" onclick="switchTab('weather')">Weather</button>
-      <button class="tab-btn" onclick="switchTab('tips')">AI Tips</button>
+      <button class="tab-btn" onclick="switchTab('tips')">Tips</button>
     </div>
 
     <div id="tab-overview" class="tab-pane active"></div>
@@ -1626,55 +1626,181 @@ function wmoDesc(code) {
 }
 
 // ── AI TIPS ──
-let tipsLoaded = {};
-async function renderTips() {
+// ── TIPS (offline, curated) ──
+const TIPS_DB = {
+  // ── UNIVERSAL (always shown) ──
+  universal: [
+    { icon: '📋', title: 'Scan all documents', text: 'Before leaving, photograph your passport, visa, insurance, and booking confirmations. Store copies in Google Drive or email them to yourself so you can access them even if your phone is lost.' },
+    { icon: '💳', title: 'Notify your bank', text: 'Tell your bank and card provider your travel dates before you go. Many banks auto-block foreign transactions as fraud — a quick call or app notification prevents your card from being declined abroad.' },
+    { icon: '📶', title: 'Get a local SIM or eSIM', text: 'Buy a local SIM at the airport or activate an eSIM before travel (Airalo, Holafly). Local data is far cheaper than roaming and keeps you connected for maps and translation the moment you land.' },
+    { icon: '🔌', title: 'Carry a power bank', text: 'A 10,000–20,000 mAh power bank is essential. Long transit days, flights, and sightseeing will drain your phone. Airports and cafes often have limited outlets.' },
+    { icon: '💵', title: 'Always carry small cash', text: 'Markets, street food, tuk-tuks, tips, and rural areas almost always require cash. Withdraw from ATMs inside banks or malls to avoid skimming devices on standalone street ATMs.' },
+    { icon: '🗺️', title: 'Download offline maps', text: 'Download Google Maps or Maps.me for your destinations before you leave home. Offline maps work without data and are a lifesaver when you land with no SIM or in areas with poor signal.' },
+    { icon: '🧳', title: 'Use packing cubes', text: 'Packing cubes compress clothes, keep your bag organised, and make airport security easier. Separate clean and worn clothes into different cubes so you never have to dig through everything.' },
+    { icon: '🔐', title: 'Use a VPN on public WiFi', text: 'Hotel, airport, and cafe WiFi is often unsecured. Use a VPN (ProtonVPN has a free tier) when accessing banking, email, or anything sensitive on public networks.' },
+  ],
+
+  // ── REGIONS ──
+  southeast_asia: [
+    { icon: '🛺', title: 'Negotiate before you ride', text: 'Always agree on the price with tuk-tuks, motorbike taxis, and non-metered taxis before getting in. Use Grab (the region\'s Uber) for fair, fixed prices in cities like Bangkok, KL, Ho Chi Minh City, and Jakarta.' },
+    { icon: '🙏', title: 'Dress for temples', text: 'Temples and religious sites require covered shoulders and knees. Keep a lightweight sarong or scarf in your bag — many temples loan them but it\'s cleaner to carry your own.' },
+    { icon: '🌶️', title: 'Street food is the best food', text: 'The most authentic and affordable meals are always at street stalls and local markets. Look for stalls with a queue of locals — high turnover means fresh ingredients. Carry hand sanitiser.' },
+    { icon: '💊', title: 'Pack stomach medication', text: 'Traveller\'s diarrhoea is common when adjusting to local food and water. Bring oral rehydration salts, loperamide, and probiotics. Avoid ice in drinks at smaller establishments.' },
+    { icon: '☀️', title: 'Heat and humidity are real', text: 'Temperatures regularly hit 33–38°C with high humidity. Drink water constantly, use SPF 50+ sunscreen, and plan outdoor sightseeing for early morning (7–10am) or late afternoon to avoid peak heat.' },
+    { icon: '🦟', title: 'Use mosquito repellent', text: 'Dengue fever is present across Southeast Asia. Use DEET-based repellent, especially at dawn and dusk. Consider long sleeves in the evenings and bring a mosquito coil for guesthouses without screens.' },
+  ],
+  south_asia: [
+    { icon: '🚗', title: 'Hire a driver for the day', text: 'Day-hire drivers (₹1500–3000 in India) are much more practical than taxis for visiting multiple sites. Your hotel can arrange reliable options, or use OlaCabs / Ola Outstation for transparent pricing.' },
+    { icon: '🍽️', title: 'Stick to cooked food', text: 'Avoid raw salads, unpeeled fruit, and tap water. Eat at busy, well-lit restaurants. Thalis at local dhabas are cheap, fresh, and filling — the food is cooked to order and constantly replenished.' },
+    { icon: '🛕', title: 'Remove shoes at religious sites', text: 'Temples, mosques, and gurudwaras require shoe removal. Wear easy slip-on footwear. Some sites also require head covering — carry a dupatta or small cloth in your bag.' },
+    { icon: '🚂', title: 'Book trains in advance', text: 'Indian Railways (IRCTC) trains fill up weeks ahead. Book Tatkal tickets (released 1 day before) if you miss the window. Rajdhani and Shatabdi express trains are the most reliable options.' },
+    { icon: '📱', title: 'Use UPI and digital payments', text: 'India\'s UPI system (GPay, PhonePe, Paytm) is accepted almost everywhere — shops, autos, restaurants. Set it up if you have an Indian number. Reduces need to carry large amounts of cash.' },
+    { icon: '🌡️', title: 'Check seasonal conditions', text: 'Monsoon (Jun–Sep) brings heavy rains and flooding in many regions. Rajasthan and deserts are extremely hot (45°C+) in summer. North India is cold in December–January. Time your visit to each region accordingly.' },
+  ],
+  europe: [
+    { icon: '🚆', title: 'Book trains early for discounts', text: 'European rail tickets (Eurail, Trenitalia, SNCF, DB) are significantly cheaper when booked 30–60 days ahead. Flexipass rail passes are worth it only if you\'re doing 5+ long-distance journeys.' },
+    { icon: '🏛️', title: 'Pre-book popular attractions', text: 'The Colosseum, Eiffel Tower, Sagrada Família, Uffizi Gallery, and Anne Frank House all require timed entry tickets booked days or weeks ahead. Walk-up queues can be 3–4 hours.' },
+    { icon: '🧾', title: 'Validate your train ticket', text: 'In Italy, France, and Spain, you must stamp/validate your ticket at the platform machine before boarding. Failure to do so can result in a fine even with a valid ticket.' },
+    { icon: '💶', title: 'Carry some Euros always', text: 'Many European markets, small restaurants, and rural areas are cash-only. Withdraw from bank ATMs (Euronet charges high fees). Revolut and Wise cards offer excellent exchange rates with no fees.' },
+    { icon: '🚶', title: 'Most cities are walkable', text: 'Historic city centres in Rome, Prague, Amsterdam, and Lisbon are compact and best explored on foot. Buy a day transit pass for outlying areas — most cities offer 24/48/72hr tourist passes.' },
+    { icon: '🌤️', title: 'Weather varies significantly', text: 'Northern Europe (UK, Scandinavia) is cool and rainy year-round — always pack a waterproof layer. Southern Europe (Greece, Spain, Italy) is hot and sunny Jun–Sep but mild in shoulder season.' },
+  ],
+  middle_east: [
+    { icon: '👗', title: 'Dress modestly outside resorts', text: 'In UAE, Saudi Arabia, and Jordan, cover shoulders and knees in public spaces, souks, and mosques. In Dubai, swimwear is fine at beaches and pools, but cover up when moving through malls or streets.' },
+    { icon: '🕌', title: 'Respect prayer times', text: 'During the 5 daily prayer times (especially Friday prayers), some shops close for 20–30 minutes. During Ramadan, eating, drinking, or smoking in public during daylight hours is prohibited and illegal.' },
+    { icon: '🌡️', title: 'Extreme summer heat', text: 'May–September temperatures reach 40–48°C in the Gulf. Most activities move indoors. Plan outdoor sightseeing early morning or after sunset. Stay hydrated aggressively — carry water everywhere.' },
+    { icon: '🚕', title: 'Use Careem or Uber', text: 'Careem (regional) and Uber operate reliably across the UAE, Jordan, and Egypt. Avoid unmarked taxis which overcharge tourists significantly. Always agree on price or ensure meter is running.' },
+    { icon: '💰', title: 'Bargaining is expected in souks', text: 'In traditional markets (souks), the first price is always inflated 2–3x. Counter-offer at 40–50% of asking price. Walk away slowly if no agreement — you\'ll often be called back. Never bargain aggressively.' },
+  ],
+  east_asia: [
+    { icon: '🥢', title: 'Learn basic local etiquette', text: 'In Japan, never stick chopsticks upright in rice (funeral symbolism) and avoid eating while walking. In China, pouring tea for others before yourself is polite. Small gestures are noticed and appreciated.' },
+    { icon: '📱', title: 'Download local apps', text: 'WeChat Pay and Alipay are essential for China (many places are cashless). In Japan, Suica card covers all transit. In Korea, T-money card works on all buses and subways. Set these up before arrival.' },
+    { icon: '🗾', title: 'Transit cards save time', text: 'IC cards (Suica/Pasmo in Japan, T-money in Korea, Octopus in Hong Kong) work on all metro, bus, and many convenience store purchases. Load them at airport stations immediately on arrival.' },
+    { icon: '🍜', title: 'Convenience stores are underrated', text: 'Japan\'s 7-Eleven, FamilyMart, and Lawson sell excellent fresh food, ATMs (Japan Post ATMs accept foreign cards when bank ATMs don\'t), and nearly everything you need 24/7.' },
+    { icon: '🔒', title: 'VPN required for China', text: 'Google, WhatsApp, Instagram, and most Western apps are blocked in mainland China. Download and activate a VPN (ExpressVPN, NordVPN) before you enter China — you cannot download them once inside.' },
+  ],
+  africa: [
+    { icon: '💉', title: 'Check vaccination requirements', text: 'Yellow fever vaccination is mandatory for entry to many African countries and required if you\'ve transited through affected regions. Malaria prophylaxis is recommended for most of sub-Saharan Africa — consult a travel doctor.' },
+    { icon: '🦟', title: 'Malaria prevention is critical', text: 'Take prescribed antimalarials consistently, use DEET repellent from dusk to dawn, sleep under treated nets, and wear long sleeves in the evening. Don\'t skip doses even if you feel fine.' },
+    { icon: '💧', title: 'Drink only bottled water', text: 'Tap water is not potable in most of Africa. Drink only sealed bottled water, use water purification tablets for remote areas, and avoid ice in drinks outside major hotels.' },
+    { icon: '📸', title: 'Ask before photographing people', text: 'Always ask permission before photographing locals. In some countries (Sudan, Ethiopia), photographing government buildings, military, or infrastructure is illegal and can result in camera confiscation.' },
+    { icon: '💵', title: 'USD cash is widely accepted', text: 'US dollars are accepted alongside local currency in many African countries, especially for safari bookings, visas on arrival, and larger purchases. Bring crisp, unfolded notes — damaged bills are often refused.' },
+  ],
+  americas: [
+    { icon: '🤑', title: 'Tipping is mandatory in North America', text: 'In the US and Canada, tipping 18–22% at restaurants is standard, not optional. Tip bartenders $1–2/drink, hotel housekeeping $2–5/night, and taxi/rideshare 15–20%. Not tipping is considered rude.' },
+    { icon: '🏥', title: 'Get comprehensive travel insurance', text: 'US medical costs are extraordinary — a single night in hospital can cost $10,000+. Ensure your travel insurance covers medical evacuation. Always carry your insurance card and emergency number.' },
+    { icon: '🌮', title: 'Explore beyond tourist areas', text: 'In Mexico and Central America, the best food and experiences are in local neighbourhoods. Taquerías and mercados serve better food at a fraction of tourist restaurant prices. Use local transport where safe.' },
+    { icon: '🚌', title: 'Long-distance buses are reliable', text: 'In South and Central America, companies like Cruz del Sur, Flixbus, and RedBus operate comfortable overnight buses between cities — far cheaper than flying and with scenic routes.' },
+  ],
+  // ── SPECIFIC COUNTRIES / CITIES ──
+  vietnam: [
+    { icon: '🏍️', title: 'Traffic chaos is normal', text: 'Vietnamese city traffic, especially in Hanoi and Ho Chi Minh City, moves in constant streams of motorbikes. To cross the road, walk slowly and steadily — traffic flows around you. Never run or freeze.' },
+    { icon: '🍜', title: 'Eat phở for breakfast', text: 'Phở is traditionally a breakfast dish. Head to a local phở shop before 9am for the freshest broth. Bún bò Huế (spicy beef noodle) and bánh mì from street carts are equally unmissable.' },
+    { icon: '💰', title: 'Bargain respectfully', text: 'Markets and non-metered transport expect negotiation. Start at 50–60% of the asking price. Smile, stay friendly, and be willing to walk away. Most vendors will meet somewhere in the middle.' },
+  ],
+  thailand: [
+    { icon: '👑', title: 'Respect the monarchy', text: 'Criticism of the Thai royal family (lèse-majesté) is a criminal offence with prison sentences. Avoid any negative comments about the monarchy in public or online while in Thailand.' },
+    { icon: '🛺', title: 'Use Grab, not tuk-tuks for transport', text: 'Grab gives fixed, fair prices. Tuk-tuks and unmarked taxis routinely overcharge tourists. If taking a tuk-tuk, always negotiate price before getting in and be wary of "helpful" drivers suggesting gem shops.' },
+    { icon: '🍛', title: 'Eat pad see ew over pad thai', text: 'Pad thai on tourist streets is often watered down. Try pad see ew, khao man gai, or som tam at local restaurants. Night markets like Bangkok\'s Or Tor Kor have exceptional quality at local prices.' },
+  ],
+  japan: [
+    { icon: '🚯', title: 'There are almost no public bins', text: 'Japan has very few public rubbish bins — carry a small bag for your own rubbish. Convenience stores have bins near their entrance. Never leave litter; it is genuinely considered antisocial.' },
+    { icon: '🗣️', title: 'Quiet in public spaces', text: 'Talking on phones on trains is frowned upon. Keep voices low on public transport, don\'t play audio without headphones, and queue orderly and silently. Politeness is the social currency.' },
+    { icon: '🏨', title: 'Try a ryokan', text: 'Staying at least one night in a traditional ryokan (Japanese inn) with onsen (hot spring), yukata robes, and multi-course kaiseki dinner is a genuinely once-in-a-lifetime experience worth the splurge.' },
+  ],
+  dubai: [
+    { icon: '🚇', title: 'Dubai Metro is excellent', text: 'The Dubai Metro is clean, air-conditioned, affordable, and on time. It covers most tourist areas including Downtown, Dubai Mall, and the Marina. Get a Nol card at any station for seamless travel.' },
+    { icon: '🏖️', title: 'Public beach rules', text: 'Public beaches require modest swimwear (no thongs). Public displays of affection are illegal. Alcohol is only available in licensed restaurants and hotels — not on beaches or public spaces.' },
+    { icon: '🕌', title: 'Visit the Blue Mosque early', text: 'The Jumeirah Mosque is open for non-Muslim visitors on selected mornings. Arrive early, dress conservatively, and join the guided tour — it is one of the most informative cultural experiences in Dubai.' },
+  ],
+  india: [
+    { icon: '🚂', title: 'Book trains via IRCTC', text: 'Register on IRCTC (irctc.co.in) to book trains directly. Tatkal quota opens 1 day before departure at 10am (AC) and 11am (non-AC). Premium Tatkal has no waitlist but is more expensive.' },
+    { icon: '🌡️', title: 'Adjust to the heat gradually', text: 'Stay hydrated (2–3L water/day minimum), avoid midday sun between 12–4pm, wear cotton clothing, and carry a small hand fan or portable mist spray. Mango lassi and coconut water are ideal hydration.' },
+    { icon: '🍛', title: 'Tell them your spice tolerance', text: 'Indian spice levels are genuinely high. At restaurants, explicitly say "mild please" or "less spicy" — even medium local spice can be very hot for those unaccustomed. Dahi (yoghurt) cools spice quickly.' },
+  ],
+  singapore: [
+    { icon: '🌿', title: 'Gardens by the Bay at night', text: 'The free Supertree light show (Garden Rhapsody) runs at 7:45pm and 8:45pm nightly. Arrive 15 minutes early for a good spot. The paid OCBC Skyway walkway through the treetops is worth the price.' },
+    { icon: '🍽️', title: 'Eat at hawker centres', text: 'Singapore hawker centres are UNESCO-listed cultural heritage. Maxwell Food Centre, Lau Pa Sat, and Tiong Bahru Market offer Michelin-quality dishes (some literally Michelin starred) for S$3–8.' },
+    { icon: '🚇', title: 'EZ-Link card for everything', text: 'The EZ-Link card works on all MRT and bus routes. Singapore\'s public transport is world-class — faster and cheaper than taxis for almost every journey. Get the card at any MRT station on arrival.' },
+  ],
+};
+
+// Map destination names to tip categories
+function getTipCategories(destName) {
+  const n = destName.toLowerCase();
+  const cats = ['universal'];
+  // Specific cities/countries first (more specific = higher priority)
+  if (n.includes('vietnam') || n.includes('hanoi') || n.includes('ho chi minh') || n.includes('saigon') || n.includes('da nang') || n.includes('hoi an')) cats.push('vietnam');
+  if (n.includes('thailand') || n.includes('bangkok') || n.includes('chiang mai') || n.includes('phuket') || n.includes('koh')) cats.push('thailand');
+  if (n.includes('japan') || n.includes('tokyo') || n.includes('osaka') || n.includes('kyoto') || n.includes('hiroshima')) cats.push('japan');
+  if (n.includes('dubai') || n.includes('abu dhabi') || n.includes('sharjah')) cats.push('dubai');
+  if (n.includes('india') || n.includes('mumbai') || n.includes('delhi') || n.includes('bangalore') || n.includes('chennai') || n.includes('kolkata') || n.includes('goa') || n.includes('jaipur') || n.includes('kerala')) cats.push('india');
+  if (n.includes('singapore')) cats.push('singapore');
+  // Regional fallbacks
+  const seAsia = ['cambodia','laos','myanmar','malaysia','indonesia','bali','philippines','kuala lumpur','kl ','penang'];
+  if (seAsia.some(x => n.includes(x))) cats.push('southeast_asia');
+  if (['vietnam','thailand','japan','singapore','cambodia','laos','myanmar','malaysia','indonesia','philippines','korea','hong kong','taiwan','china','bali'].some(x => n.includes(x))) {
+    if (!cats.includes('southeast_asia') && !cats.includes('east_asia')) {
+      if (['korea','hong kong','taiwan','china'].some(x => n.includes(x))) cats.push('east_asia');
+      else cats.push('southeast_asia');
+    }
+  }
+  if (['saudi','riyadh','qatar','doha','oman','muscat','kuwait','bahrain','jordan','amman'].some(x => n.includes(x))) cats.push('middle_east');
+  if (['france','spain','italy','germany','uk','london','paris','rome','barcelona','amsterdam','prague','vienna','portugal','lisbon','greece','athens'].some(x => n.includes(x))) cats.push('europe');
+  if (['kenya','tanzania','south africa','cape town','johannesburg','egypt','cairo','morocco','nairobi','ethiopia','ghana','nigeria'].some(x => n.includes(x))) cats.push('africa');
+  if (['usa','new york','los angeles','chicago','mexico','canada','toronto','brazil','argentina','colombia','peru','chile'].some(x => n.includes(x))) cats.push('americas');
+  if (['sri lanka','nepal','bangladesh','pakistan','bhutan','maldives'].some(x => n.includes(x))) cats.push('south_asia');
+  // Default fallback — if nothing matched, just show universal + southeast asia as generic
+  if (cats.length === 1) cats.push('southeast_asia');
+  return [...new Set(cats)];
+}
+
+function renderTips() {
   const t = getTrip();
   const c = $('tips-content');
-  if (tipsLoaded[t.id]) { c.innerHTML = tipsLoaded[t.id]; return; }
-  c.innerHTML = `<div class="loader"><div class="dots"><span></span><span></span><span></span></div> Generating personalised tips…</div>`;
-  const dests = (t.destinations || []).map(d => d.name).join(', ');
-  const prompt = `You are an expert travel consultant. For a trip to ${dests} (${t.start || 'flexible dates'} to ${t.end || 'flexible'}), provide 8 specific, practical travel tips. Respond ONLY with a valid JSON array, no markdown. Each object: { icon: single emoji, title: short title under 5 words, text: 2-3 sentences of specific, actionable advice relevant to these destinations }. Cover: local customs/etiquette, food must-tries, transport hacks, money/ATM tips, safety, best areas to stay, hidden gems, weather/packing.`;
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages: [{ role: 'user', content: prompt }] }) });
-    const data = await res.json();
-    const raw = data.content?.map(b => b.text || '').join('');
-    const tips = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    const html = `
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
-        <div style="font-size:13px;font-weight:500">${t.destinations.map(d => d.name).join(' · ')}</div>
-        <span class="ai-label">✦ AI</span>
+  const dests = (t.destinations || []).filter(d => d.name);
+  if (!dests.length) { c.innerHTML = `<div style="color:var(--gray-400);font-size:13px;padding:20px 0">Add destinations to see travel tips.</div>`; return; }
+
+  // Collect tips for all destinations, deduplicate
+  const seen = new Set();
+  const allTips = [];
+  dests.forEach(dest => {
+    const cats = getTipCategories(dest.name);
+    cats.forEach(cat => {
+      (TIPS_DB[cat] || []).forEach(tip => {
+        if (!seen.has(tip.title)) { seen.add(tip.title); allTips.push({ ...tip, cat }); }
+      });
+    });
+  });
+
+  // Destination search links
+  const destQuery = dests.map(d => d.name).join(' ');
+  const googleUrl = `https://www.google.com/search?q=travel+tips+${encodeURIComponent(destQuery)}`;
+  const chatgptUrl = `https://chatgpt.com/?q=${encodeURIComponent('Give me 10 practical travel tips for ' + destQuery)}`;
+
+  c.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="font-family:var(--font-display);font-size:15px;font-weight:700;margin-bottom:4px">${dests.map(d => d.name).join(' · ')}</div>
+      <div style="font-size:12px;color:var(--gray-400)">${allTips.length} curated tips · works offline</div>
+    </div>
+
+    ${allTips.map(tip => `
+      <div class="suggestion-card" style="margin-bottom:10px">
+        <div class="sug-top"><div class="sug-icon">${tip.icon}</div><div class="sug-title">${tip.title}</div></div>
+        <div class="sug-text">${tip.text}</div>
       </div>
-      ${tips.map(tip => `
-        <div class="suggestion-card">
-          <div class="sug-top"><div class="sug-icon">${tip.icon}</div><div class="sug-title">${tip.title}</div></div>
-          <div class="sug-text">${tip.text}</div>
-        </div>
-      `).join('')}
-      <div style="font-size:11px;color:var(--gray-400);margin-top:12px;font-family:var(--font-mono)">Generated by Claude · Tap to refresh for new tips</div>
-      <button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="refreshTips()">Refresh Tips</button>
-    `;
-    tipsLoaded[t.id] = html;
-    c.innerHTML = html;
-  } catch (err) {
-    const isClaude = location.hostname.includes('claude.ai') || location.hostname.includes('anthropic');
-    c.innerHTML = `<div style="border:var(--border);border-radius:var(--radius);padding:16px;margin-top:4px">
-      <div style="font-size:15px;font-weight:600;margin-bottom:6px">⚠️ ${isClaude ? 'Preview limitation' : 'Could not load tips'}</div>
-      <div style="font-size:13px;color:var(--gray-600);line-height:1.6;margin-bottom:12px">
-        ${isClaude
-          ? `AI Tips can't run inside the Claude.ai preview due to browser security restrictions.<br><strong style="color:var(--black)">Deploy to GitHub Pages</strong> and it will work perfectly — the API call is made from your own domain.`
-          : `Could not reach the AI. Check your internet connection and try again.`}
+    `).join('')}
+
+    <div style="margin-top:20px;padding-top:16px;border-top:var(--border)">
+      <div style="font-family:var(--font-mono);font-size:10px;color:var(--gray-400);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Want more personalised tips?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${googleUrl}" target="_blank" class="btn btn-secondary btn-sm">🔍 Search Google</a>
+        <a href="${chatgptUrl}" target="_blank" class="btn btn-secondary btn-sm">✦ Ask ChatGPT</a>
       </div>
-      ${!isClaude ? `<button class="btn btn-secondary btn-sm" onclick="refreshTips()">Retry</button>` : `
-        <div style="background:var(--gray-50);border:var(--border);border-radius:var(--radius-sm);padding:12px;font-size:12px;font-family:var(--font-mono);color:var(--gray-600);line-height:1.8">
-          1. Upload index.html + manifest.json + sw.js to GitHub<br>
-          2. Settings → Pages → Deploy from branch → main<br>
-          3. Open your .github.io URL — AI Tips will work ✓
-        </div>
-      `}
-    </div>`;
-  }
+      <div style="font-size:11px;color:var(--gray-400);margin-top:8px">Opens in browser · requires internet</div>
+    </div>
+  `;
 }
-function refreshTips() { delete tipsLoaded[getTrip().id]; renderTips(); }
 
 // ── SHARE / EXPORT ──
 function openShareModal() { $('modal-share').classList.add('open'); }
